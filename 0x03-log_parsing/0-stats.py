@@ -1,42 +1,55 @@
 #!/usr/bin/python3
-import sys
-import signal
+"""
+A script: Reads standard input line by line and computes metrics
+"""
 
-total_size = 0
-status_counts = {}
-line_count = 0
 
-def print_stats():
-    print("File size: {}".format(total_size))
-    for status in sorted(status_counts.keys()):
-        if status_counts[status] > 0:
-            print("{}: {}".format(status, status_counts[status]))
-
-def signal_handler(sig, frame):
-    print_stats()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)
-
-valid_status_codes = [200, 301, 400, 401, 403, 404, 405, 500]
-
-for line in sys.stdin:
-    parts = line.split()
-    if len(parts) < 7:
-        continue
+def parseLogs():
+    """
+    Reads logs from standard input and generates reports
+    Reports:
+        * Prints log size after reading every 10 lines & at KeyboardInterrupt
+    Raises:
+        KeyboardInterrupt (Exception): handles this exception and raises it
+    """
+    stdin = __import__('sys').stdin
+    lineNumber = 0
+    fileSize = 0
+    statusCodes = {}
+    codes = ('200', '301', '400', '401', '403', '404', '405', '500')
     try:
-        file_size = int(parts[-1])
-        status_code = int(parts[-2])
-        if status_code not in valid_status_codes:
-            continue
-    except ValueError:
-        continue
+        for line in stdin:
+            lineNumber += 1
+            line = line.split()
+            try:
+                fileSize += int(line[-1])
+                if line[-2] in codes:
+                    try:
+                        statusCodes[line[-2]] += 1
+                    except KeyError:
+                        statusCodes[line[-2]] = 1
+            except (IndexError, ValueError):
+                pass
+            if lineNumber == 10:
+                report(fileSize, statusCodes)
+                lineNumber = 0
+        report(fileSize, statusCodes)
+    except KeyboardInterrupt as e:
+        report(fileSize, statusCodes)
+        raise
 
-    total_size += file_size
-    if status_code not in status_counts:
-        status_counts[status_code] = 0
-    status_counts[status_code] += 1
 
-    line_count += 1
-    if line_count % 10 == 0:
-        print_stats()
+def report(fileSize, statusCodes):
+    """
+    Prints generated report to standard output
+    Args:
+        fileSize (int): total log size after every 10 successfully read line
+        statusCodes (dict): dictionary of status codes and counts
+    """
+    print("File size: {}".format(fileSize))
+    for key, value in sorted(statusCodes.items()):
+        print("{}: {}".format(key, value))
+
+
+if __name__ == '__main__':
+    parseLogs()
